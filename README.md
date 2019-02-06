@@ -1,4 +1,4 @@
-﻿# [Pycode: 파이썬 활용 내용 정리]
+﻿# [Pycode: 파이썬 활용 정리]
 
 
 ## **Folder**
@@ -7,11 +7,12 @@
 
 - Doit_pandas
 
-- introduction_ML
+- Introduction_ML
 
 - Scratch_DL
 
 ---
 
-:white_check_mark: 
+:white_check_mark:
+
 :red_circle:
