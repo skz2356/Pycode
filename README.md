@@ -1,7 +1,7 @@
 ﻿# [Pycode: 파이썬 활용 정리]
 
 
-## **Folder**
+## Folder
 
 - Basic
 
@@ -11,8 +11,6 @@
 
 - Scratch_DL
 
----
+##
 
-:white_check_mark:
-
-:red_circle:
+:white_check_mark: :red_circle:
