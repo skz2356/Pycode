@@ -1,0 +1,254 @@
+---
+title: '**Cy young prediction**'
+author: "Jaehyun Lee"
+date: "2018/09/17"
+output:
+  ioslides_presentation: default
+---
+## 0. Table of Content
+1. Data preprocessing
+2. Create a regression model
+3. Create function
+4. Result
+5. Conclusion
+6. Add More ++
+
+?# 1. Data preprocessing
+* baseball reference
+    * Awards Voting data - cy.csv
+    * Player Standard Pitching data - cy2018.csv
+    * Player Value data - cy2018.csv
+* Lahman
+    * pitching data - Pitching2017.csv
+
+```{r, include=FALSE}
+setwd("C:\\Users\\dl?og\\Desktop\\Rcode")
+library(plyr)
+pitching <- read.csv("pitching2017.csv")
+cy <- read.csv("Cy.csv")
+cy2018 <- read.csv("cy2018.csv")
+```
+
+## 1. Data preprocessing
+```{r}
+cy$Nameco <- as.character(cy$Nameco)
+cyy <- cy[,-c(1:6, 8, 9, 13, 34)]
+Acy2018 <- sub?et(cy2018, Lg == "AL")
+Ncy2018 <- subset(cy2018, Lg == "NL")
+```
+
+## 2. Create a regression model
+* Generalized linear model
+* Vote points
+
+## 2. Create a regression model
+### 2.1 Train Data, Test Data
+```{r}
+library(glmnet)
+x <- model.matrix(Vote.Pts ~., ?yy)[,-1]
+y <- cyy$Vote.Pts
+set.seed(1)
+train = sample(1:nrow(cyy),190)
+test = (-train)
+ytest = y[test]
+```
+
+## 2. Create a regression model
+### 2.2 Model application
+```{r}
+set.seed(1)
+cv.lasso <- cv.glmnet(x[train,], y[train], alpha = 0.8)
+lasso.coef = pr?dict(cv.lasso, type = "coefficients",
+                     s = cv.lasso$lambda.min) # coefficients
+lasso.prediction = predict(cv.lasso, s = cv.lasso$lambda.min,
+                           newx = x[test,]) # coefficients
+```
+
+## 2. Create a regression model?### 2.3 Check Coefficient
+```{r}
+lasso.coef
+b <- lasso.coef
+```
+
+## 2. Create a regression model
+### 2.3 Check Coefficient
+* WAR, W, L, ERA, CG, WHIP
+
+## 2. Create a regression model
+### 2.4 Find the minimum MSE
+```{r}
+cv.lasso$lambda.min
+cor(lasso.predict?on, ytest)
+sqrt((mean(lasso.prediction - ytest)^2))
+```
+
+## 3. Create function
+```{r}
+cpoint <- function(py) {
+  d <- with(py, 
+            b[1]
+            + b[2] * WAR 
+            + b[3] * W + b[4] * L
+            + b[5] * ERA + b[7] * GS
+            + ?[9] * CG + b[10] * SHO
+            + b[11] * SV + b[12] * IP
+            + b[15] * ER + b[16] * HR
+            + b[17] * BB + b[18] * IBB
+            + b[19] * SO + b[20] * HBP
+            + b[22] * WP + b[24] * WHIP
+            )
+  d
+}
+```
+
+## 4. Result
+#?# 4.1 Apply functions to AL
+```{r}
+Aresult <- cpoint(Acy2018)
+head(Acy2018$Name[(order(Aresult, decreasing = T))])
+```
+
+## 4. Result
+### 4.2 Apply functions to NL
+```{r}
+Nresult <- cpoint(Ncy2018)
+head(Ncy2018$Name[(order(Nresult, decreasing = T))])
+```
+
+#? 5. Conclusion
+* AL Cy Young Winner
+    * Blake Snell
+* NL Cy Young Winner
+    * Max Scherzer
+    
+## 6. Add More ++
+```{r, include=FALSE}
+setwd("C:\\Users\\dlwog\\Desktop\\Rcode")
+MVPB <- read.csv("MVPB.csv")
+MVPB2018 <- read.csv("MVPB2018.csv")
+MVPP <- r?ad.csv("MVPP.csv")
+MVPP2018 <- read.csv("MVPP2018.csv")
+```
+
+```{r, include=FALSE}
+MVPB$Nameco <- as.character(MVPB$Nameco)
+NMVPB <- MVPB[,-c(1:5, 7, 8)]
+AMVPB2018 <- subset(MVPB2018, Lg == "AL" & AB >= 150)
+NMVPB2018 <- subset(MVPB2018, Lg == "NL" & AB >=?150)
+
+library(glmnet)
+x <- model.matrix(Vote.Pts ~., NMVPB)[,-1]
+y <- NMVPB$Vote.Pts
+set.seed(1)
+train = sample(1:nrow(NMVPB), 470)
+test = (-train)
+ytest = y[test]
+
+set.seed(1)
+cv.lasso <- cv.glmnet(x[train,], y[train], alpha = 0.9)
+lasso.coef = predict(cv?lasso, type = "coefficients",
+                     s = cv.lasso$lambda.min) # coefficients
+lasso.prediction = predict(cv.lasso, s = cv.lasso$lambda.min,
+                           newx = x[test,]) # coefficients
+
+lasso.coef
+b <- lasso.coef
+
+cv.lasso$lambda?min
+cor(lasso.prediction, ytest)
+sqrt((mean(lasso.prediction - ytest)^2))
+
+bmpoint <- function(py) {
+  d <- with(py, 
+            b[1]
+            + b[2] * WAR + b[3] * G
+            + b[5] * R + b[7] * HR
+            + b[8] * RBI + b[9] * SB
+            +?b[11] * BA + b[12] * OBP
+            )
+}
+```
+
+```{r}
+bmAresult <- bmpoint(AMVPB2018)
+head(AMVPB2018$Name[(order(bmAresult, decreasing = T))])
+
+bmNresult <- bmpoint(NMVPB2018)
+head(NMVPB2018$Name[(order(bmNresult, decreasing = T))])
+```
+
+## 6. Add More ++
+`?`{r, include=FALSE}
+MVPP$Nameco <- as.character(MVPP$Nameco)
+NMVPP <- MVPP[,-c(1:5, 7, 8)]
+AMVPP2018 <- subset(MVPP2018, Lg == "AL" & IP >= 50)
+NMVPP2018 <- subset(MVPP2018, Lg == "NL" & IP >= 50)
+
+library(glmnet)
+x <- model.matrix(Vote.Pts ~., NMVPP)[,-1]?y <- NMVPP$Vote.Pts
+set.seed(1)
+train = sample(1:nrow(NMVPP), 110)
+test = (-train)
+ytest = y[test]
+
+set.seed(1)
+cv.lasso <- cv.glmnet(x[train,], y[train], alpha = 0.9)
+lasso.coef = predict(cv.lasso, type = "coefficients",
+                     s = cv.lasso$?ambda.min) # coefficients
+lasso.prediction = predict(cv.lasso, s = cv.lasso$lambda.min,
+                           newx = x[test,]) # coefficients
+
+lasso.coef
+b <- lasso.coef
+
+cv.lasso$lambda.min
+cor(lasso.prediction, ytest)
+sqrt((mean(lasso.prediction - y?est)^2))
+
+pmpoint <- function(py) {
+  d <- with(py, 
+            b[1]
+            + b[2] * WAR + b[3] * W + b[4] * L
+            + b[5] * ERA + b[6] * WHIP
+            + b[7] * G + b[8] * GS
+            + b[9] * SV + b[10] * IP
+            + b[11] * H
+    ?       + b[12] * HR
+            + b[13] * BB
+            + b[14] * SO
+            )
+}
+```
+
+```{r}
+pmAresult <- pmpoint(AMVPP2018)
+head(AMVPP2018$Name[(order(pmAresult, decreasing = T))])
+
+pmNresult <- pmpoint(NMVPP2018)
+head(NMVPP2018$Name[(order(pmNresult? decreasing = T))])
+```
+
+## 6. Add More ++
+```{r}
+sale <- pmpoint(subset(AMVPP2018, Nameco == "salech01"))
+betts <- bmpoint(subset(AMVPB2018, Nameco == "bettsmo01"))
+scherzer <- pmpoint(subset(NMVPP2018, Nameco == "scherma01"))
+yelich <- bmpoint(subset(NMV?B2018, Nameco == "yelicch01"))
+```
+
+## 6. Add More ++
+```{r}
+betts
+sale
+
+yelich
+scherzer
+```
+
+## 6. Add More ++
+* AL MVP Winner
+    * Mookie Betts
+* NL MVP Winner
+    * Christian Yelich
+    
+# Thank you for watching

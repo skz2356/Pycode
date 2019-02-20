@@ -1,0 +1,128 @@
+---
+title: '**Expected FA contract for 2018**'
+author: "Jaehyun Lee"
+date: "2018/10/08"
+output:
+  ioslides_presentation: default
+---
+
+## 0. Table of Content
+
+## 1. Data preprocessing
+* FA1218B2.csv - Statiz
+* FA1218P2.csv - Statiz
+```{r, include=FALSE}
+Sys.setlocale("LC_ALL", "C")
+getwd()
+setwd("C:/Users/dlwog/Desktop")
+baseball_statcast <- read.csv("FA1218B2.csv", header = TRUE)
+```
+
+## 1. Data preprocessing
+* Normalization
+```{r}
+normalize <- function(x) {
+  return((x - min(x)) / (max(x) - min(x)))
+}
+
+normalize_baseball <- as.data.frame(lapply(baseball_statcast, normalize))
+```
+
+## 1. Data preprocessing
+* Revert from normalization
+```{r}
+unnormalize <-  function(x) { 
+  return((x * (max(baseball_statcast$aincome) - min(baseball_statcast$aincome))) + min(baseball_statcast$aincome))
+}
+```
+
+## 1. Data preprocessing
+* Data segmentation (train Vs. test)
+```{r}
+set.seed(1)
+strain <- sample(1:nrow(normalize_baseball), 40)
+stest <- (-strain)
+training <- normalize_baseball[strain,]
+test <- normalize_baseball[stest,]
+```
+
+## 1. Data preprocessing
+* Data segmentation (train Vs. test)
+```{r}
+summary(training$aincome)
+summary(test$aincome)
+```
+
+## 2. Create a Neural network model
+```{r}
+library(neuralnet)
+set.seed(1)
+baseball_model <-  neuralnet(aincome ~ tWAR + WAR + age + Pscore + G + PA + AB + R + X1B + X2B + X3B + HR + TB + RBI + SB + CS + BB + HBP + IBB + SO + GDP + SH + SF + AVG + OBP + SLG + OPS + wOBA + wRC., data = training, hidden = c(1,1))
+```
+
+## 2. Create a Neural network model
+* Model evaluation
+```{r}
+set.seed(1)
+model_results <-  compute(baseball_model, test[1:((ncol(test)) - 2)])
+predicted_aincome <-  model_results$net.result
+```
+
+## 2. Create a Neural network model
+* Model evaluation
+```{r}
+cor(predicted_aincome, test$aincome)
+```
+
+## 2. Create a Neural network model
+* Model evaluation
+```{r}
+GS <- unnormalize(test$aincome)
+set.seed(1)
+NS <- unnormalize(predicted_aincome)
+cor(NS,GS)
+sqrt(mean(NS - GS)^2)
+```
+
+## 3. Create a regression model
+```{r}
+library(glmnet)
+baseball_statcast <- read.csv("FA1218B2.csv", header = TRUE)
+x <- model.matrix(aincome ~., baseball_statcast)[,-1]
+y <- baseball_statcast$aincome
+```
+
+## 3. Create a regression model
+* Data segmentation (train Vs. test)
+```{r}
+set.seed(1)
+train = sample(1:nrow(baseball_statcast),40)
+test = (-train)
+ytest = y[test]
+```
+
+## 3. Create a regression model
+* Find lambda with minimal MSE (Cross Validation)
+```{r}
+for (i in 0:10) {
+set.seed(1)
+cv.lasso <- cv.glmnet(x[train,], y[train], alpha = 0.1*i)
+lasso.coef = predict(cv.lasso, type = "coefficients", s = cv.lasso$lambda.min)
+lasso.prediction = predict(cv.lasso, s = cv.lasso$lambda.min, newx = x[test,])
+lasso.coef
+cv.lasso$lambda.min
+c <- cor(lasso.prediction, ytest)
+d <- sqrt((mean(lasso.prediction - ytest)^2))
+print(c)
+print(d)
+print(0.1*i)
+}
+```
+
+## 3. Create a regression model
+* Find lambda with minimal MSE (Cross Validation)
+```{r}
+set.seed(1)
+cv.lasso <- cv.glmnet(x[train,], y[train], alpha = 0.3)
+plot(cv.lasso$glmnet.fit, xvar="lambda", label=TRUE)
+```

@@ -1,0 +1,28 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+setwd("C:\\Users\\dlwog\\Desktop\\Rcode")
+Awards <- read.csv("AwardsPlayers.csv")
+```
+
+```{r}
+head(Awards)
+table(Awards$awardID)
+```
+
+```{r}
+cyw <- subset(Awards, awardID == "Cy Young")
+head(cyw)
+
+pit <- read.csv("pitching.csv")
+# (IP/2 - ER) + SO/10 + W
+# ((5*IP/9)-ER) + (SO/12) + (SV*2.5) + SHO + ((W*6)-(L*2)) + (VB*12)
+# IPouts 이닝으로
+# 전체 VB
+# cwp 계산
+# 리그우승 Teams
+
+```

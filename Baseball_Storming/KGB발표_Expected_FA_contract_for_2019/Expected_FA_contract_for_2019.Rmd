@@ -1,0 +1,361 @@
+---
+title: "<font color = ##008B8B>Expected FA contract for 2019</font>"
+author: "<font color = ##008B8B>Jaehyun Lee</font>"
+date: "<font color = ##008B8B>2018-12-13</font>"
+output:
+  ioslides_presentation
+widescreen : TRUE
+---
+
+## <font color = ##008B8B>0. Table of Content</font>
+1. Data preprocessing
+2. LASSO
+3. Create a regression model
+4. Applying the model
+5. Conclusion
+
+# <font color = ##008B8B>Data preprocessing</font>
+
+## <font color = ##008B8B>1. Data preprocessing</font>
+
+## <font color = ##008B8B>1. Data preprocessing</font>
+
+<center>
+<img src = "C:\\Users\\dlwog\\Desktop\\fa1.jpg", width = 65%>
+</center>
+<center>
+<font size="2em">[그림 1: NC 다이노스 양의지]</font>
+</center>
+
+## <font color = ##008B8B>1. Data preprocessing</font>
+
+## <font color = ##008B8B>1. Data preprocessing</font>
+
+* Statiz (www.statiz.co.kr)
+    * baseball_B - FA1218B1.csv
+    * baseball_B2 - FA1218B2.csv
+    * baseball_B3 - FA1218P2.csv
+    * baseball_P - FA1218P1.csv
+    * baseball_P2 - FA1218P2.csv
+    * baseball_P3 - FA1218P3.csv
+
+```{r, include=FALSE}
+Sys.setlocale("LC_ALL", "C")
+getwd()
+setwd("C:/Users/dlwog/Desktop")
+baseball_B3 <- read.csv("FA1218B3.csv", header = TRUE)
+baseball_P3 <- read.csv("FA1218P3.csv", header = TRUE)
+baseball_B2 <- read.csv("FA1218B2.csv", header = TRUE)
+baseball_P2 <- read.csv("FA1218P2.csv", header = TRUE)
+baseball_B1 <- read.csv("FA1218B1.csv", header = TRUE)
+baseball_P1 <- read.csv("FA1218P1.csv", header = TRUE)
+```
+
+# <font color = ##008B8B>LASSO</font>
+
+## <font color = ##008B8B>2. LASSO</font>
+
+## <font color = ##008B8B>2. LASSO</font>
+
+**LASSO?**
+
+## <font color = ##008B8B>2. LASSO</font>
+
+**LASSO?**
+
+- Associated with linear regression
+
+## <font color = ##008B8B>2. LASSO</font>
+
+**LASSO?**
+
+- Associated with linear regression
+
+- One type of machine learning algorithm
+
+## <font color = ##008B8B>2. LASSO</font>
+
+**LASSO?**
+
+- Associated with linear regression
+
+- One type of machine learning algorithm
+
+- Penalization
+
+# <font color = ##008B8B>Create a regression model</font>
+
+## <font color = ##008B8B>3. Create a regression model</font>
+
+## <font color = ##008B8B>3. Create a regression model</font>
+
+```{r}
+library(glmnet)
+baseball_B2 <- read.csv("FA1218B2.csv", header = TRUE)
+x <- model.matrix(aincome ~., baseball_B2)[,-1]
+y <- baseball_B2$aincome
+```
+
+## <font color = ##008B8B>3. Create a regression model</font>
+
+**Data segmentation (train Vs. test)**
+
+```{r}
+set.seed(1)
+train = sample(1:nrow(baseball_B2),40)
+test = (-train)
+ytest = y[test]
+```
+
+## <font color = ##008B8B>3. Create a regression model</font>
+
+**Find lambda with minimal MSE (Cross Validation)**
+
+```{r, eval = FALSE}
+for (i in 0:10) {
+set.seed(1)
+cv.lasso <- cv.glmnet(x[train,], y[train], alpha = 0.1*i)
+lasso.coef = predict(cv.lasso, type = "coefficients", 
+                     s = cv.lasso$lambda.min)
+lasso.prediction = predict(cv.lasso, s = cv.lasso$lambda.min,
+                           newx = x[test,])
+lasso.coef
+cv.lasso$lambda.min
+c <- cor(lasso.prediction, ytest)
+d <- sqrt((mean(lasso.prediction - ytest)^2))
+print(c)
+print(d)
+print(0.1*i)
+}
+```
+
+## <font color = ##008B8B>3. Create a regression model</font>
+
+**Find lambda with minimal MSE (Cross Validation)**
+
+```{r, echo = FALSE}
+for (i in 0:10) {
+set.seed(1)
+cv.lasso <- cv.glmnet(x[train,], y[train], alpha = 0.1*i)
+lasso.coef = predict(cv.lasso, type = "coefficients", 
+                     s = cv.lasso$lambda.min)
+lasso.prediction = predict(cv.lasso, s = cv.lasso$lambda.min,
+                           newx = x[test,])
+lasso.coef
+cv.lasso$lambda.min
+c <- cor(lasso.prediction, ytest)
+d <- sqrt((mean(lasso.prediction - ytest)^2))
+print(c)
+print(d)
+print(0.1*i)
+}
+```
+
+## <font color = ##008B8B>3. Create a regression model</font>
+
+**Find lambda with minimal MSE (Cross Validation)**
+
+```{r}
+set.seed(1)
+cv.lasso <- cv.glmnet(x[train,], y[train], alpha = 0.4)
+plot(cv.lasso$glmnet.fit, xvar = "lambda", label=TRUE)
+```
+
+```{r, echo = FALSE}
+baseball_P2 <- read.csv("FA1218P2.csv", header = TRUE)
+x <- model.matrix(aincome ~., baseball_P2)[,-1]
+y <- baseball_P2$aincome
+
+set.seed(1)
+train = sample(1:nrow(baseball_P2), 20)
+test = (-train)
+ytest = y[test]
+
+set.seed(1)
+cv.lasso2 <- cv.glmnet(x[train,], y[train], alpha = 1)
+lasso.prediction2 = predict(cv.lasso2, s = cv.lasso2$lambda.min,
+                           newx = x[test,])
+```
+```{r, echo = FALSE}
+cv.lasso2$lambda.min
+cor(lasso.prediction2, ytest)
+sqrt((mean(lasso.prediction2 - ytest)^2))
+```
+
+## <font color = ##008B8B>3. Create a regression model</font>
+
+**Create function (B)**
+
+```{r, echo = FALSE}
+b = predict(cv.lasso, type = "coefficients", 
+                     s = cv.lasso$lambda.min)
+b
+```
+
+## <font color = ##008B8B>3. Create a regression model</font>
+
+**Create function (B)**
+
+```{r, include = FALSE}
+b = predict(cv.lasso, type = "coefficients", 
+                     s = cv.lasso$lambda.min)
+```
+```{r}
+FAB <- function(FA) {
+  d <- with(FA, 
+            b[1]
+            + b[2] * tWAR + b[3] * WAR
+            + b[4] * age + b[5] * Pscore
+            + b[6] * G + b[9] * R
+            + b[10] * X1B + b[11] * X2B
+            + b[12] * X3B
+            + b[13] * HR
+            + b[14] * TB
+            + b[16] * SB
+            + b[18] * BB + b[19] * HBP 
+            + b[20] * IBB + b[21] * SO
+            + b[22] * GDP + b[24] * SF
+            + b[26] * OBP
+            )
+}
+```
+
+## <font color = ##008B8B>3. Create a regression model</font>
+
+**Pitcher model, contract period..**
+
+```{r, include = FALSE}
+b2 = predict(cv.lasso2, type = "coefficients", 
+                     s = cv.lasso2$lambda.min)
+```
+```{r, include = FALSE}
+FAP <- function(FA) {
+  d <- with(FA, 
+            b2[1]
+            + b2[3] * WAR + b2[4] * age + b2[9] * W
+            )
+}
+```
+
+# <font color = ##008B8B>Applying the model</font>
+
+## <font color = ##008B8B>4. Applying the model</font>
+
+## <font color = ##008B8B>4. Applying the model</font>
+
+```{r}
+as.character(baseball_B1[,1])
+FABat <- FAB(baseball_B1)
+FABat
+```
+
+## <font color = ##008B8B>4. Applying the model</font>
+
+```{r}
+as.character(baseball_P1[,1])
+FAPit <- FAP(baseball_P1)
+FAPit
+```
+
+## <font color = ##008B8B>4. Applying the model</font>
+
+```{r, echo = FALSE}
+library(glmnet)
+baseball_B3 <- read.csv("FA1218B3.csv", header = TRUE)
+x <- model.matrix(period ~., baseball_B3)[,-1]
+y <- baseball_B3$period
+
+set.seed(1)
+train = sample(1:nrow(baseball_B3),40)
+test = (-train)
+ytest = y[test]
+
+
+set.seed(1)
+cv.lasso <- cv.glmnet(x[train,], y[train], alpha = 0.4)
+b = predict(cv.lasso, type = "coefficients", 
+                     s = cv.lasso$lambda.min)
+
+FAB2 <- function(FA) {
+  d <- with(FA, 
+            b[1]
+            + b[3] * WAR + b[4] * age + b[5] * Pscore
+            + b[7] * PA + b[12] * X3B
+            + b[17] * CS + b[18] * BB
+            + b[25] * AVG
+            )
+}
+```
+```{r}
+as.character(baseball_B1[,1])
+FABat2 <- FAB2(baseball_B1)
+FABat2
+```
+
+## <font color = ##008B8B>4. Applying the model</font>
+
+```{r, echo = FALSE}
+library(glmnet)
+baseball_P3 <- read.csv("FA1218P3.csv", header = TRUE)
+x <- model.matrix(period ~., baseball_P3)[,-1]
+y <- baseball_P3$period
+
+set.seed(1)
+train = sample(1:nrow(baseball_P3),20)
+test = (-train)
+ytest = y[test]
+
+set.seed(1)
+cv.lasso <- cv.glmnet(x[train,], y[train], alpha = 0)
+b = predict(cv.lasso, type = "coefficients", 
+                     s = cv.lasso$lambda.min)
+
+FAP2 <- function(FA) {
+  d <- with(FA, b[1] + tWAR * b[2] + WAR * b[3] + age * b[4] + G * b[5] + CG * b[6] + SHO * b[7] + SP * b[8] + W * b[9] + L * b[10] + S * b[11] + H * b[12] + IP * b[13] + R * b[14] + ER * b[15] + PA * b[16] + X1B * b[17] + X2B * b[18] + X3B * b[19] + HR * b[20] + BB * b[21] + IBB * b[22] + HBP * b[23] + SO * b[24] + BK * b[25] + WP * b[26] + ERA * b[27] + FIP * b[28] + WHIP * b[29] + ERA. * b[30] + FIP. * b[31]
+  )
+}
+```
+```{r}
+as.character(baseball_P1[,1])
+FAPit2 <- FAP2(baseball_P1)
+FAPit2
+```
+
+# <font color = ##008B8B>Conclusion</font>
+
+## <font color = ##008B8B>5. Conclusion</font>
+
+## <font color = ##008B8B>5. Conclusion</font>
+
+```{r}
+as.character(baseball_B1[,1])
+round(FABat2)
+FABat * round(FABat2)
+```
+
+## <font color = ##008B8B>5. Conclusion</font>
+
+```{r}
+as.character(baseball_P1[,1])
+FAPit2 <- FAP2(baseball_P1)
+round(FAPit2)
+FAPit * round(FAPit2)
+```
+
+## <font color = ##008B8B>5. Conclusion</font>
+
+**Reality vs Expectation**
+
+## <font color = ##008B8B>5. Conclusion</font>
+
+**Reality vs Expectation**
+
+- 양의지 [4년 125억원 vs 4년 93억원]
+
+- 모창민 [3년 20억원 vs 3년 17억원]
+
+- 최정 [6년 106억원 vs 4년 94억원]
+
+- 이재원 [4년 69억원 vs 4년 58억원]
+
+# <font color = ##008B8B>Thank you for watching</font>

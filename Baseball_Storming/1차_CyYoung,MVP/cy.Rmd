@@ -1,0 +1,98 @@
+---
+title: "**[Cy young prediction]**"
+output: html_notebook
+---
+
+# 1. Data preprocessing
+* baseball reference
+    * Awards Voting data - cy.csv
+    * Player Standard Pitching data - cy2018.csv
+    * Player Value data - cy2018.csv
+* Lahman
+    * pitching data - pitching.csv
+```{r, include = FALSE}
+setwd("C:\\Users\\dlwog\\Desktop\\Rcode")
+library(plyr)
+pitching <- read.csv("pitching2017.csv")
+cy <- read.csv("Cy.csv")
+cy2018 <- read.csv("cy2018.csv")
+```
+
+```{r}
+cy$Nameco <- as.character(cy$Nameco)
+cyy <- cy[,-c(1:6, 8, 9, 13, 34)]
+Acy2018 <- subset(cy2018, Lg == "AL")
+Ncy2018 <- subset(cy2018, Lg == "NL")
+```
+
+# 2. Create a regression model
+* Generalized linear model
+* Vote points
+
+### 2.1 Train Data, Test Data
+```{r}
+library(glmnet)
+x <- model.matrix(Vote.Pts ~., cyy)[,-1]
+y <- cyy$Vote.Pts
+set.seed(1)
+train = sample(1:nrow(cyy),190)
+test = (-train)
+ytest = y[test]
+```
+
+### 2.2 Model application
+```{r}
+set.seed(1)
+cv.lasso <- cv.glmnet(x[train,], y[train], alpha = 0.8)
+lasso.coef = predict(cv.lasso, type = "coefficients", s = cv.lasso$lambda.min) # coefficients
+lasso.prediction = predict(cv.lasso, s = cv.lasso$lambda.min, newx = x[test,]) # coefficients
+lasso.coef
+b <- lasso.coef
+```
+
+### 2.3 Find the minimum MSE
+```{r}
+cv.lasso$lambda.min
+cor(lasso.prediction, ytest)
+sqrt((mean(lasso.prediction - ytest)^2))
+```
+
+# 3. Create function
+```{r}
+cpoint <- function(py) {
+  d <- with(py, 
+            b[1]
+            + b[2] * WAR 
+            + b[3] * W
+            + b[4] * L
+            + b[5] * ERA
+            + b[7] * GS
+            + b[9] * CG
+            + b[10] * SHO
+            + b[11] * SV
+            + b[12] * IP
+            + b[15] * ER
+            + b[16] * HR
+            + b[17] * BB
+            + b[18] * IBB
+            + b[19] * SO
+            + b[20] * HBP
+            + b[22] * WP
+            + b[24] * WHIP
+            )
+  d
+}
+```
+
+# 4. Result
+### 4.1 Apply functions to AL
+```{r}
+Aresult <- cpoint(Acy2018)
+head(Acy2018$Name[(order(Aresult, decreasing = T))])
+```
+
+### 4.2 Apply functions to NL
+```{r}
+Nresult <- cpoint(Ncy2018)
+head(Ncy2018$Name[(order(Nresult, decreasing = T))])
+```

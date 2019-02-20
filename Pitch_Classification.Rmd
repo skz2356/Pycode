@@ -1,0 +1,801 @@
+---
+title: "Untitled"
+author: "Jaehyun Lee"
+date: "2018년 11월 9일"
+output: html_document
+---
+
+## Data Preprocessing
+```{r}
+PitchSample <- read.csv("C:\\Users\\dlwog\\Desktop\\savant_t_all.csv",
+                        stringsAsFactors = F)
+X <- PitchSample
+X$pitch_type <- as.factor(X$pitch_type)
+X <- cbind(X[1], as.data.frame(scale(X[2:19])))
+
+set.seed(1)
+indexes = sample(1:nrow(X), size = 0.7*nrow(X))
+train = X[indexes,]
+test = X[-indexes,]
+
+train_labels <- train[,1]
+test_labels <- test[,1]
+
+table(test_labels)
+# "CH", "CU", "EP", "FC", "FF", "FS", "FT", "KN", "PO", "SI", "SL"
+```
+
+## k-NN
+```{r}
+library(class)
+library(e1071)
+library(gmodels)
+
+set.seed(1)
+knn.cross <- tune.knn(x = train[,-1], y = train_labels, 
+                      k = 1:10,
+                      tunecontrol = tune.control(sampling =
+                                                   "cross"),
+                      cross = 5)
+```
+
+```{r}
+summary(knn.cross)
+plot(knn.cross)
+```
+
+```{r}
+set.seed(1)
+kNN3 = knn(train[,-1], test[,-1], train_labels, k = 3)
+table(test_labels, kNN3)
+sum(diag(table(test_labels, kNN3)))/length(test$pitch_type)
+```
+
+## Decision Tree
+```{r}
+library(rpart)
+
+Tm <- rpart(pitch_type ~., data = train)
+testm <- predict(Tm, newdata = test, type = "class")
+
+table(test_labels, testm)
+sum(diag(table(test_labels, testm)))/length(test$pitch_type)
+```
+
+```{r}
+plot(m, compress = TRUE, margin = 0.2)
+text(m, cex = 1.5)
+```
+
+```{r}
+library(rpart.plot)
+
+prp(m, type = 0, extra = 2)
+prp(m, type = 1, extra = 2)
+prp(m, type = 2, extra = 2)
+prp(m, type = 3, extra = 2)
+prp(m, type = 4, extra = 2)
+```
+
+## Random Forest
+```{r}
+library(randomForest)
+
+set.seed(1)
+RFm <- randomForest(pitch_type ~., data = train, ntree = 100)
+set.seed(1)
+testm <- predict(RFm, newdata=test, type = "class")
+
+table(test_labels, testm)
+sum(diag(table(test_labels, testm)))/length(test$pitch_type)
+```
+
+## Multinomial Logistic Regression
+```{r}
+library(nnet) 
+
+LRm <- multinom(pitch_type ~., data = train)
+testm <- predict(LRm, newdata = test, type = "class")
+
+table(test_labels, testm)
+sum(diag(table(test_labels, testm)))/length(test$pitch_type)
+```
+
+## Naive Bayes
+```{r}
+library(e1071)
+
+NBm <- naiveBayes(train, train_labels, laplace = 0.01)
+testm <- predict(NBm, test)
+
+table(test_labels, testm)
+sum(diag(table(test_labels, testm)))/length(test$pitch_type)
+```
+
+## Support Vector Machine
+```{r}
+library(e1071)
+
+#SVMm1 <- svm(pitch_type ~., data = train, kernel = "linear")
+#SVMm2 <- svm(pitch_type ~., data = train, kernel = "polynomial")
+SVMm3 <- svm(pitch_type ~., data = train, kernel = "radial")
+
+#testm1 <- predict(SVMm1, test)
+#testm2 <- predict(SVMm2, test)
+testm3 <- predict(SVMm3, test)
+
+#table(test_labels, testm1)
+#sum(diag(table(test_labels, testm1)))/length(test$pitch_type)
+#table(test_labels, testm2)
+#sum(diag(table(test_labels, testm2)))/length(test$pitch_type)
+table(test_labels, testm3)
+sum(diag(table(test_labels, testm3)))/length(test$pitch_type)
+```
+
+## Bagging
+```{r}
+library(ipred)
+
+set.seed(1)
+BGm <- bagging(pitch_type ~., data = train, nbagg = 30)
+
+set.seed(1)
+testm <- predict(BGm, test)
+table(droplevels(test_labels), testm)
+sum(diag(table(droplevels(test_labels), testm)))/length(test$pitch_type)
+```
+
+## XGboost
+```{r}
+library(xgboost)
+library(dplyr)
+library(caret)
+
+dtrain <- as.matrix(train[,2:19])
+dtest <- as.matrix(test[,2:19])
+
+train_labels  <- train$pitch_type
+test_labels <- test$pitch_type
+```
+
+```{r}
+numberOfClasses <- length(unique(train_labels)) + 1
+param <- list("objective" = "multi:softmax",
+              "eval_metric" = "mlogloss",
+              "num_class" = numberOfClasses)
+XBfit <- xgboost(dtrain, label = train_labels,
+               nround = 350,
+               params = param)
+
+```
+
+```{r}
+xgb_pred <- predict(XBfit, dtest)
+ntest_labels <- as.numeric(test_labels)
+
+table(xgb_pred, ntest_labels)
+sum(diag(table(xgb_pred, ntest_labels)))/length(test_labels)
+```
+
+## test set
+```{r}
+PitchSample2 <- read.csv("C:\\Users\\dlwog\\Desktop\\savant_p_all.csv",
+                        stringsAsFactors = F)
+X <- PitchSample2
+X$pitch_type <- as.factor(X$pitch_type)
+X <- cbind(X[1], as.data.frame(scale(X[2:19])))
+
+# 결과용
+#Rtest <- X
+
+# --------------------
+# 확인용 샘플 추출
+set.seed(1)
+indexes = sample(1:nrow(X), size = 1000)
+Rtest = X[indexes,]
+# --------------------
+
+Rtest_labels <- Rtest[,1]
+Rtest_labels <- factor(Rtest_labels, 
+                       levels = c("CH", "CU", "EP", "FC",
+                                "FF", "FS", "FT", "KN", 
+                                "PO", "SI", "SL"),
+                       labels = c("CH", "CU", "EP", "FC",
+                                "FF", "FS", "FT", "KN", 
+                                "PO", "SI", "SL"))
+table(Rtest_labels)
+```
+
+```{r}
+# k-NN
+set.seed(1)
+kNN3 = knn(train[,-1], Rtest[,-1], train_labels, k = 3)
+CrossTable(Rtest_labels, kNN3)
+sum(diag(table(Rtest_labels, kNN3)))/length(Rtest$pitch_type)
+```
+
+```{r}
+# Decision Tree
+testm <- predict(Tm, newdata = Rtest, type = "class")
+
+CrossTable(Rtest_labels, testm)
+sum(diag(table(Rtest_labels, testm)))/length(Rtest$pitch_type)
+```
+
+```{r}
+# Random Forest
+set.seed(1)
+RFtestm <- predict(RFm, newdata = Rtest, type = "class")
+
+table(Rtest_labels, RFtestm)
+sum(diag(table(Rtest_labels, RFtestm)))/length(Rtest$pitch_type)
+sum(Rtest_labels == RFtestm)/length(Rtest$pitch_type)
+```
+
+```{r}
+# Multinomial Logistic Regression
+testm <- predict(LRm, newdata = Rtest, type = "class")
+
+CrossTable(Rtest_labels, testm)
+sum(diag(table(Rtest_labels, testm)))/length(Rtest$pitch_type)
+```
+
+```{r}
+# Naive Bayes
+NBtrain <- train
+NBtrain$pitch_type <- factor(NBtrain$pitch_type, levels = c("CH", "CU", "FC", "FF", "FS", "FT", "SI", "SL"))
+NBtrain_labels <- factor(train_labels, levels = c("CH", "CU", "FC", "FF", "FS", "FT", "SI", "SL")) 
+NBm2 <- naiveBayes(NBtrain, NBtrain_labels, laplace = 0.01)
+
+testm <- predict(NBm2, Rtest)
+   
+#testm <- predict(NBm, Rtest)
+
+table(Rtest_labels, testm)
+#sum(diag(table(Rtest_labels, testm)))/length(Rtest$pitch_type)
+sum(as.vector(Rtest_labels) == as.vector(testm))/length(Rtest$pitch_type)
+```
+
+```{r}
+# Support Vector Machine
+#testm1 <- predict(SVMm1, Rtest)
+#testm2 <- predict(SVMm2, Rtest)
+testm3 <- predict(SVMm3, Rtest)
+
+#table(Rtest_labels, testm1)
+#sum(diag(table(Rtest_labels, testm1)))/length(Rtest$pitch_type)
+#table(Rtest_labels, testm2)
+#sum(diag(table(Rtest_labels, testm2)))/length(Rtest$pitch_type)
+table(Rtest_labels, testm3)
+sum(diag(table(Rtest_labels, testm3)))/length(Rtest$pitch_type)
+```
+
+```{r}
+# Bagging
+set.seed(1)
+testm <- predict(BGm, Rtest)
+CrossTable(Rtest_labels, factor(testm, 
+                       levels = c("CH", "CU", "EP", "FC",
+                                "FF", "FS", "FT", "KN", 
+                                "PO", "SI", "SL")))
+sum(diag(table(Rtest_labels, factor(testm, 
+                       levels = c("CH", "CU", "EP", "FC",
+                                "FF", "FS", "FT", "KN", 
+                                "PO", "SI", "SL"))))/length(Rtest$pitch_type))
+```
+
+```{r}
+# XGboost
+dRtest <- as.matrix(Rtest[,2:19])
+
+xgb_pred <- predict(XBfit, dRtest)
+ntest_labels <- as.numeric(Rtest_labels)
+table(ntest_labels,factor(xgb_pred, levels = c("1","2","3","4","5","6","7","8","9","10","11")))
+sum(diag(table(xgb_pred, ntest_labels)))/length(Rtest_labels)
+```
+
+## 이산형 범주 모델 구종군 인덱스 
+```{r}
+xgb_pred <- gsub(c(2), "C", xgb_pred)
+xgb_pred <- gsub(c(3), "C", xgb_pred)
+xgb_pred <- gsub(c(4), "C", xgb_pred)
+xgb_pred <- gsub(c(11), "C", xgb_pred)
+xgb_pred <- gsub(c(5), "B", xgb_pred)
+xgb_pred <- gsub(c(7), "B", xgb_pred)
+xgb_pred <- gsub(c(9), "B", xgb_pred)
+xgb_pred <- gsub(c(10), "B", xgb_pred)
+xgb_pred <- gsub(c(1), "A", xgb_pred)
+xgb_pred <- gsub(c(6), "A", xgb_pred)
+xgb_pred <- gsub(c(8), "A", xgb_pred)
+xgb_pred <- data.frame(cbind(c(1:length(xgb_pred)), xgb_pred))
+
+Aindexes <- subset(xgb_pred, xgb_pred == "A")
+Aindexes <- as.vector(Aindexes$V1)
+Aindexes <- as.numeric(Aindexes)
+
+Bindexes <- subset(xgb_pred, xgb_pred == "B")
+Bindexes <- as.vector(Bindexes$V1)
+Bindexes <- as.numeric(Bindexes)
+
+Cindexes <- subset(xgb_pred, xgb_pred == "C")
+Cindexes <- as.vector(Cindexes$V1)
+Cindexes <- as.numeric(Cindexes)
+```
+
+## 범주형 모델 구종군 인덱스
+```{r}
+RFtestm <- gsub("FC", "C", RFtestm)
+RFtestm <- gsub("SL", "C", RFtestm)
+RFtestm <- gsub("CU", "C", RFtestm)
+RFtestm <- gsub("EP", "C", RFtestm)
+RFtestm <- gsub("FF", "B", RFtestm)
+RFtestm <- gsub("FT", "B", RFtestm)
+RFtestm <- gsub("SI", "B", RFtestm)
+RFtestm <- gsub("PO", "B", RFtestm)
+RFtestm <- gsub("CH", "A", RFtestm)
+RFtestm <- gsub("FS", "A", RFtestm)
+RFtestm <- gsub("KN", "A", RFtestm)
+RFtestm <- data.frame(cbind(c(1:length(RFtestm)), RFtestm))
+
+Aindexes <- subset(RFtestm, RFtestm == "A")
+Aindexes <- as.vector(Aindexes$V1)
+Aindexes <- as.numeric(Aindexes)
+
+Bindexes <- subset(RFtestm, RFtestm == "B")
+Bindexes <- as.vector(Bindexes$V1)
+Bindexes <- as.numeric(Bindexes)
+
+Cindexes <- subset(RFtestm, RFtestm == "C")
+Cindexes <- as.vector(Cindexes$V1)
+Cindexes <- as.numeric(Cindexes)
+```
+
+## 구종군 실제 테스트 자료
+```{r}
+ARtest <- Rtest[Aindexes,]
+BRtest <- Rtest[Bindexes,]
+CRtest <- Rtest[Cindexes,]
+
+ARtest_labels <- ARtest[,1]
+BRtest_labels <- BRtest[,1]
+CRtest_labels <- CRtest[,1]
+```
+
+## 구종군 모형 전처리
+```{r}
+X <- PitchSample
+
+X$pitch_type <- as.factor(X$pitch_type)
+X <- cbind(X[1], as.data.frame(scale(X[2:19])))
+
+A <- subset(X, X$pitch_type == "CH" | X$pitch_type == "FS" | X$pitch_type == "KN")
+B <- subset(X, X$pitch_type == "SI" | X$pitch_type == "PO" | X$pitch_type == "FT" | X$pitch_type == "FF")
+C <- subset(X, X$pitch_type == "SL" | X$pitch_type == "FC" | X$pitch_type == "CU" | X$pitch_type == "EP")
+
+set.seed(1)
+indexes = sample(1:nrow(A), size = 0.7*nrow(A))
+Atrain = A[indexes,]
+Atrain$pitch_type <- factor(Atrain$pitch_type)
+Atest = A[-indexes,]
+Atest$pitch_type <- factor(Atest$pitch_type)
+
+Atrain_labels <- Atrain[,1]
+Atest_labels <- Atest[,1]
+
+set.seed(1)
+indexes = sample(1:nrow(B), size = 0.7*nrow(B))
+Btrain = B[indexes,]
+Btrain$pitch_type <- factor(Btrain$pitch_type)
+Btest = B[-indexes,]
+Btest$pitch_type <- factor(Btest$pitch_type)
+
+Btrain_labels <- Btrain[,1]
+Btest_labels <- Btest[,1]
+
+set.seed(1)
+indexes = sample(1:nrow(C), size = 0.7*nrow(C))
+Ctrain = C[indexes,]
+Ctrain$pitch_type <- factor(Ctrain$pitch_type)
+Ctest = C[-indexes,]
+Ctest$pitch_type <- factor(Ctest$pitch_type)
+
+Ctrain_labels <- Ctrain[,1]
+Ctest_labels <- Ctest[,1]
+```
+
+## 구종군 A 모델 만들기 
+```{r}
+#k-NN
+library(class)
+library(e1071)
+library(gmodels)
+
+set.seed(1)
+kNN3A = knn(Atrain[,-1], Atest[,-1], Atrain_labels, k = 3)
+
+table(Atest_labels, kNN3A)
+sum(diag(table(Atest_labels, kNN3A)))/length(Atest$pitch_type)
+```
+
+```{r}
+# Decision Tree
+library(rpart)
+
+TmA <- rpart(pitch_type ~., data = Atrain)
+testm <- predict(TmA, newdata = Atest, type = "class")
+
+table(Atest_labels, testm)
+sum(diag(table(Atest_labels, testm)))/length(Atest$pitch_type)
+```
+
+```{r}
+# Random Forest
+library(randomForest)
+
+set.seed(1)
+RFmA <- randomForest(pitch_type ~., data = Atrain, ntree = 100)
+set.seed(1)
+testm <- predict(RFmA, newdata = Atest, type = "class")
+
+table(Atest_labels, testm)
+sum(diag(table(Atest_labels, testm)))/length(Atest$pitch_type)
+```
+
+```{r}
+# Multinomial Logistic Regression
+library(nnet) 
+
+LRmA <- multinom(pitch_type ~., data = Atrain)
+testm <- predict(LRmA, newdata = Atest, type = "class")
+
+table(Atest_labels, testm)
+sum(diag(table(Atest_labels, testm)))/length(Atest$pitch_type)
+```
+
+```{r}
+# Naive Bayes
+library(e1071)
+NBAtrain <- Atrain
+NBAtrain$pitch_type <- factor(NBAtrain$pitch_type, levels = c("CH", "FS", "KN"))
+NBAtrain_labels <- factor(Atrain_labels, levels = c("CH", "FS", "KN")) 
+
+NBmA <- naiveBayes(NBAtrain, NBAtrain_labels, laplace = 0.01)
+testm <- predict(NBmA, Atest)
+
+table(Atest_labels, testm)
+sum(diag(table(Atest_labels, testm)))/length(Atest$pitch_type)
+```
+
+```{r}
+# Support Vector Machine
+library(e1071)
+
+SVMm3A <- svm(pitch_type ~., data = Atrain, kernel = "radial")
+testm3 <- predict(SVMm3A, Atest)
+
+table(Atest_labels, testm3)
+sum(diag(table(Atest_labels, testm3)))/length(Atest$pitch_type)
+```
+
+## Bagging
+```{r}
+library(ipred)
+
+set.seed(1)
+BGmA <- bagging(pitch_type ~., data = Atrain, nbagg = 30)
+
+set.seed(1)
+testm <- predict(BGmA, Atest)
+table(Atest_labels, testm)
+sum(diag(table(Atest_labels, testm3)))/length(Atest$pitch_type)
+```
+
+```{r}
+# XGboost
+library(xgboost)
+library(dplyr)
+library(caret)
+
+dAtrain <- as.matrix(Atrain[,2:19])
+dAtest <- as.matrix(Atest[,2:19])
+
+dAtrain_labels  <- Atrain$pitch_type
+dAtest_labels <- Atest$pitch_type
+```
+
+```{r}
+numberOfClasses <- length(unique(dAtrain_labels)) + 1
+param <- list("objective" = "multi:softmax",
+              "eval_metric" = "mlogloss",
+              "num_class" = numberOfClasses)
+XBfitA <- xgboost(dAtrain, label = dAtrain_labels,
+               nround = 350,
+               params = param)
+
+```
+
+```{r}
+xgb_pred <- predict(XBfitA, dAtest)
+ntest_labels <- as.numeric(dAtest_labels)
+
+table(xgb_pred, ntest_labels)
+sum(diag(table(xgb_pred, ntest_labels)))/length(dAtest_labels)
+```
+
+## 구종군 B 모델 만들기
+```{r}
+#k-NN
+library(class)
+library(e1071)
+library(gmodels)
+
+set.seed(1)
+kNN3B = knn(Btrain[,-1], Btest[,-1], Btrain_labels, k = 3)
+
+table(Btest_labels, kNN3B)
+sum(diag(table(Btest_labels, kNN3B)))/length(Btest$pitch_type)
+```
+
+```{r}
+# Decision Tree
+library(rpart)
+
+TmB <- rpart(pitch_type ~., data = Btrain)
+testm <- predict(TmB, newdata = Btest, type = "class")
+
+table(Btest_labels, testm)
+sum(diag(table(Btest_labels, testm)))/length(Btest$pitch_type)
+```
+
+```{r}
+# Random Forest
+library(randomForest)
+
+set.seed(1)
+RFmB <- randomForest(pitch_type ~., data = Btrain, ntree = 100)
+set.seed(1)
+testm <- predict(RFmB, newdata = Btest, type = "class")
+
+table(Btest_labels, testm)
+sum(diag(table(Btest_labels, testm)))/length(Btest$pitch_type)
+```
+
+```{r}
+# Multinomial Logistic Regression
+library(nnet) 
+
+LRmB <- multinom(pitch_type ~., data = Btrain)
+testm <- predict(LRmB, newdata = Btest, type = "class")
+
+table(Btest_labels, testm)
+sum(diag(table(Btest_labels, testm)))/length(Btest$pitch_type)
+```
+
+```{r}
+# Naive Bayes
+library(e1071)
+
+NBBtrain <- Btrain
+NBBtrain$pitch_type <- factor(NBBtrain$pitch_type, levels = c("FF", "FT", "PO", "SI"))
+NBBtrain_labels <- factor(Btrain_labels, levels = c("FF", "FT", "PO", "SI")) 
+
+NBmB <- naiveBayes(NBBtrain, NBBtrain_labels, laplace = 0.01)
+testm <- predict(NBmB, Btest)
+
+table(Btest_labels, testm)
+#sum(diag(table(Btest_labels, testm)))/length(Btest$pitch_type)
+sum(as.vector(Btest_labels) == as.vector(testm))/length(Btest$pitch_type)
+```
+
+```{r}
+# Support Vector Machine
+library(e1071)
+
+SVMm3B <- svm(pitch_type ~., data = Btrain, kernel = "radial")
+testm3 <- predict(SVMm3B, Btest)
+
+table(Btest_labels, testm3)
+sum(diag(table(Btest_labels, testm3)))/length(Btest$pitch_type)
+```
+
+## Bagging
+```{r}
+library(ipred)
+
+set.seed(1)
+BGmB <- bagging(pitch_type ~., data = Btrain, nbagg = 30)
+
+set.seed(1)
+testm <- predict(BGmB, Btest)
+table(Btest_labels, testm)
+sum(diag(table(Btest_labels, testm3)))/length(Btest$pitch_type)
+```
+
+```{r}
+# XGboost
+library(xgboost)
+library(dplyr)
+library(caret)
+
+dBtrain <- as.matrix(Btrain[,2:19])
+dBtest <- as.matrix(Btest[,2:19])
+
+dBtrain_labels  <- Btrain$pitch_type
+dBtest_labels <- Btest$pitch_type
+```
+
+```{r}
+numberOfClasses <- length(unique(dBtrain_labels)) + 1
+param <- list("objective" = "multi:softmax",
+              "eval_metric" = "mlogloss",
+              "num_class" = numberOfClasses)
+XBfitB <- xgboost(dBtrain, label = dBtrain_labels,
+               nround = 350,
+               params = param)
+
+```
+
+```{r}
+xgb_pred <- predict(XBfitB, dBtest)
+ntest_labels <- as.numeric(dBtest_labels)
+
+table(xgb_pred, ntest_labels)
+sum(diag(table(xgb_pred, ntest_labels)))/length(dBtest_labels)
+```
+
+## 구종군 C 모델 만들기
+```{r}
+#k-NN
+library(class)
+library(e1071)
+library(gmodels)
+
+set.seed(1)
+kNN3C = knn(Ctrain[,-1], Ctest[,-1], Ctrain_labels, k = 3)
+
+table(Ctest_labels, kNN3C)
+sum(diag(table(Ctest_labels, kNN3C)))/length(Ctest$pitch_type)
+```
+
+```{r}
+# Decision Tree
+library(rpart)
+
+TmC <- rpart(pitch_type ~., data = Ctrain)
+testm <- predict(TmC, newdata = Ctest, type = "class")
+
+table(Ctest_labels, testm)
+sum(diag(table(Ctest_labels, testm)))/length(Ctest$pitch_type)
+```
+
+```{r}
+# Random Forest
+library(randomForest)
+
+set.seed(1)
+RFmC <- randomForest(pitch_type ~., data = Ctrain, ntree = 100)
+set.seed(1)
+testm <- predict(RFmC, newdata = Ctest, type = "class")
+
+table(Ctest_labels, testm)
+sum(diag(table(Ctest_labels, testm)))/length(Ctest$pitch_type)
+```
+
+```{r}
+# Multinomial Logistic Regression
+library(nnet) 
+
+LRmC <- multinom(pitch_type ~., data = Ctrain)
+testm <- predict(LRmC, newdata = Ctest, type = "class")
+
+table(Ctest_labels, testm)
+sum(diag(table(Ctest_labels, testm)))/length(Ctest$pitch_type)
+```
+
+```{r}
+# Naive Bayes
+library(e1071)
+
+NBCtrain <- Ctrain
+NBCtrain$pitch_type <- factor(NBCtrain$pitch_type, levels = c("CU", "EP", "FC", "SL"))
+NBCtrain_labels <- factor(Ctrain_labels, levels = c("CU", "EP", "FC", "SL"))
+
+NBmC <- naiveBayes(NBCtrain, NBCtrain_labels, laplace = 0.01)
+testm <- predict(NBmC, Ctest)
+
+table(Ctest_labels, testm)
+sum(as.vector(Ctest_labels) == as.vector(testm))/length(Ctest$pitch_type)
+```
+
+```{r}
+# Support Vector Machine
+library(e1071)
+
+SVMm3C <- svm(pitch_type ~., data = Ctrain, kernel = "radial")
+testm3 <- predict(SVMm3C, Ctest)
+
+table(Ctest_labels, testm3)
+sum(diag(table(Ctest_labels, testm3)))/length(Ctest$pitch_type)
+```
+
+## Bagging
+```{r}
+library(ipred)
+
+set.seed(1)
+BGmC <- bagging(pitch_type ~., data = Ctrain, nbagg = 30)
+
+set.seed(1)
+testm <- predict(BGmC, Ctest)
+table(Ctest_labels, testm)
+sum(diag(table(Ctest_labels, testm)))/length(Ctest$pitch_type)
+```
+
+```{r}
+# XGboost
+library(xgboost)
+library(dplyr)
+library(caret)
+
+dCtrain <- as.matrix(Ctrain[,2:19])
+dCtest <- as.matrix(Ctest[,2:19])
+
+dCtrain_labels  <- Ctrain$pitch_type
+dCtest_labels <- Ctest$pitch_type
+```
+
+```{r}
+numberOfClasses <- length(unique(dCtrain_labels)) + 1
+param <- list("objective" = "multi:softmax",
+              "eval_metric" = "mlogloss",
+              "num_class" = numberOfClasses)
+XBfitC <- xgboost(dCtrain, label = dCtrain_labels,
+               nround = 350,
+               params = param)
+
+```
+
+```{r}
+xgb_pred <- predict(XBfitC, dCtest)
+ntest_labels <- as.numeric(dCtest_labels)
+
+table(xgb_pred, ntest_labels)
+sum(diag(table(xgb_pred, ntest_labels)))/length(dCtest_labels)
+```
+
+
+## 구종군 모형 적용 결합
+```{r}
+# A
+ARtest$pitch_type <- factor(ARtest$pitch_type, levels = c("CH", "FS", "KN"))
+Atestm <- predict(NBmA, ARtest)
+table(Atestm)
+Atestm <- as.vector(Atestm)
+AA <- cbind(Aindexes, Atestm)
+
+# B
+BRtest$pitch_type <- factor(BRtest$pitch_type, levels = c("FF", "FT", "PO", "SI"))
+Btestm <- predict(NBmB, BRtest)
+table(Btestm)
+Btestm <- as.vector(Btestm)
+BB <- cbind(Bindexes, Btestm)
+
+# C
+CRtest$pitch_type <- factor(CRtest$pitch_type, levels = c("CU", "EP", "FC", "SL"))
+Ctestm <- predict(NBmC, CRtest)
+table(Ctestm)
+Ctestm <- as.vector(Ctestm)
+CC <- cbind(Cindexes, Ctestm)
+
+TOT <- data.frame(rbind(AA, BB, CC))
+TOT$Aindexes <- as.vector(TOT$Aindexes)
+TOT$Aindexes <- as.numeric(TOT$Aindexes)
+sTOT <- TOT[c(order(TOT$Aindexes)),]
+
+model_result <- as.vector(sTOT$Atestm)
+```
+
+```{r}
+table(Rtest_labels, model_result)
+sum(Rtest_labels == model_result)/length(Rtest_labels)
+```

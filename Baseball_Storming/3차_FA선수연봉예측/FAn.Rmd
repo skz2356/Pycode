@@ -1,0 +1,316 @@
+---
+title: "**Expected FA contract 　　　　　　　for 2018**"
+author: "Jaehyun Lee"
+date: "2018/10/08"
+output: ioslides_presentation
+---
+
+## 0. Table of Content
+1. Data preprocessing
+2. Create a Neural network model
+3. Create a regression model
+4. Applying the model
+5. Conclusion
+
+## 1. Data preprocessing
+* Statiz
+    * baseball_B2 - FA1218B2.csv
+    * baseball_P2 - FA1218P2.csv
+    * baseball_B - FA1218B1.csv
+    * baseball_P - FA1218P1.csv
+```{r, include=FALSE}
+Sys.setlocale("LC_ALL", "C")
+getwd()
+setwd("C:/Users/dlwog/Desktop")
+baseball_B3 <- read.csv("FA1218B3.csv", header = TRUE)
+baseball_P3 <- read.csv("FA1218P3.csv", header = TRUE)
+baseball_B2 <- read.csv("FA1218B2.csv", header = TRUE)
+baseball_P2 <- read.csv("FA1218P2.csv", header = TRUE)
+baseball_B1 <- read.csv("FA1218B1.csv", header = TRUE)
+baseball_P1 <- read.csv("FA1218P1.csv", header = TRUE)
+```
+
+## 1. Data preprocessing
+* Normalization
+```{r}
+normalize <- function(x) {
+  return((x - min(x)) / (max(x) - min(x)))
+}
+
+normalize_baseball_B2 <- as.data.frame(lapply(baseball_B2,
+                                           normalize))
+```
+
+## 1. Data preprocessing
+* Revert from normalization
+```{r}
+unnormalize <-  function(x) { 
+  return((x * (max(baseball_B2$aincome) 
+               - min(baseball_B2$aincome))) 
+         + min(baseball_B2$aincome))
+}
+```
+
+## 1. Data preprocessing
+* Data segmentation (train Vs. test)
+```{r}
+set.seed(1)
+strain <- sample(1:nrow(normalize_baseball_B2), 40)
+stest <- (-strain)
+training <- normalize_baseball_B2[strain,]
+test <- normalize_baseball_B2[stest,]
+```
+
+## 1. Data preprocessing
+* Data segmentation (train Vs. test)
+```{r}
+summary(training$aincome)
+summary(test$aincome)
+```
+
+## 2. Create a Neural network model
+```{r}
+library(neuralnet)
+set.seed(1)
+baseball_model <-  neuralnet(aincome ~ tWAR + WAR + age + Pscore 
+                             + G + PA + AB + R + X1B 
+                             + X2B + X3B + HR + TB + RBI 
+                             + SB + CS + BB + HBP + IBB 
+                             + SO + GDP + SH + SF + AVG 
+                             + OBP + SLG + OPS + wOBA 
+                             + wRC., data = training, 
+                             hidden = c(1,1))
+```
+
+## 2. Create a Neural network model
+* Model evaluation
+```{r}
+set.seed(1)
+model_results <-  compute(baseball_model, test[1:((ncol(test)) - 1)])
+predicted_aincome <-  model_results$net.result
+```
+
+## 2. Create a Neural network model
+* Model evaluation
+```{r}
+cor(predicted_aincome, test$aincome)
+```
+
+## 2. Create a Neural network model
+* Model evaluation
+```{r}
+GS <- unnormalize(test$aincome)
+set.seed(1)
+NS <- unnormalize(predicted_aincome)
+cor(NS,GS)
+sqrt(mean(NS - GS)^2)
+```
+
+## 3. Create a regression model
+```{r}
+library(glmnet)
+baseball_B2 <- read.csv("FA1218B2.csv", header = TRUE)
+x <- model.matrix(aincome ~., baseball_B2)[,-1]
+y <- baseball_B2$aincome
+```
+
+## 3. Create a regression model
+* Data segmentation (train Vs. test)
+```{r}
+set.seed(1)
+train = sample(1:nrow(baseball_B2),40)
+test = (-train)
+ytest = y[test]
+```
+
+## 3. Create a regression model
+* Find lambda with minimal MSE (Cross Validation)
+```{r, eval = FALSE}
+for (i in 0:10) {
+set.seed(1)
+cv.lasso <- cv.glmnet(x[train,], y[train], alpha = 0.1*i)
+lasso.coef = predict(cv.lasso, type = "coefficients", 
+                     s = cv.lasso$lambda.min)
+lasso.prediction = predict(cv.lasso, s = cv.lasso$lambda.min,
+                           newx = x[test,])
+lasso.coef
+cv.lasso$lambda.min
+c <- cor(lasso.prediction, ytest)
+d <- sqrt((mean(lasso.prediction - ytest)^2))
+print(c)
+print(d)
+print(0.1*i)
+}
+```
+
+## 3. Create a regression model
+* Find lambda with minimal MSE (Cross Validation)
+```{r, echo = FALSE}
+for (i in 0:10) {
+set.seed(1)
+cv.lasso <- cv.glmnet(x[train,], y[train], alpha = 0.1*i)
+lasso.coef = predict(cv.lasso, type = "coefficients", 
+                     s = cv.lasso$lambda.min)
+lasso.prediction = predict(cv.lasso, s = cv.lasso$lambda.min,
+                           newx = x[test,])
+lasso.coef
+cv.lasso$lambda.min
+c <- cor(lasso.prediction, ytest)
+d <- sqrt((mean(lasso.prediction - ytest)^2))
+print(c)
+print(d)
+print(0.1*i)
+}
+```
+
+## 3. Create a regression model
+* Find lambda with minimal MSE (Cross Validation)
+```{r}
+set.seed(1)
+cv.lasso <- cv.glmnet(x[train,], y[train], alpha = 0.4)
+plot(cv.lasso$glmnet.fit, xvar="lambda", label=TRUE)
+```
+
+## 3. Create a regression model
+* Pitcher
+```{r, include = FALSE}
+baseball_P2 <- read.csv("FA1218P2.csv", header = TRUE)
+x <- model.matrix(aincome ~., baseball_P2)[,-1]
+y <- baseball_P2$aincome
+
+set.seed(1)
+train = sample(1:nrow(baseball_P2), 20)
+test = (-train)
+ytest = y[test]
+
+set.seed(1)
+cv.lasso2 <- cv.glmnet(x[train,], y[train], alpha = 1)
+lasso.prediction2 = predict(cv.lasso2, s = cv.lasso2$lambda.min,
+                           newx = x[test,])
+```
+```{r, echo = FALSE}
+cv.lasso2$lambda.min
+cor(lasso.prediction2, ytest)
+sqrt((mean(lasso.prediction2 - ytest)^2))
+```
+
+## 4. Applying the model
+* Create function (B)
+```{r, include = FALSE}
+b = predict(cv.lasso, type = "coefficients", 
+                     s = cv.lasso$lambda.min)
+```
+```{r}
+FAB <- function(FA) {
+  d <- with(FA, 
+            b[1]
+            + b[2] * tWAR + b[3] * WAR
+            + b[4] * age + b[5] * Pscore
+            + b[6] * G + b[9] * R
+            + b[10] * X1B + b[11] * X2B
+            + b[12] * X3B
+            + b[13] * HR
+            + b[14] * TB
+            + b[16] * SB
+            + b[18] * BB + b[19] * HBP 
+            + b[20] * IBB + b[21] * SO
+            + b[22] * GDP + b[24] * SF
+            + b[26] * OBP
+            )
+}
+```
+
+## 4. Applying the model
+* Create function (P)
+```{r, include = FALSE}
+b2 = predict(cv.lasso2, type = "coefficients", 
+                     s = cv.lasso2$lambda.min)
+b2
+```
+```{r}
+FAP <- function(FA) {
+  d <- with(FA, 
+            b2[1]
+            + b2[3] * WAR + b2[4] * age + b2[9] * W
+            )
+}
+```
+
+## 4. Applying the model
+* 양의지, 최정, 이재원, 이용규, 송광민
+```{r}
+FABat <- FAB(baseball_B1)
+FABat
+```
+
+## 4. Applying the model
+* 임창용, 장원준, 노경은, 윤성환, 장원삼
+```{r}
+FAPit <- FAP(baseball_P1)
+FAPit
+```
+
+## 5. Conclusion
+* 양의지, 최정, 이재원, 이용규, 송광민
+```{r, echo = FALSE}
+library(glmnet)
+baseball_B3 <- read.csv("FA1218B3.csv", header = TRUE)
+x <- model.matrix(period ~., baseball_B3)[,-1]
+y <- baseball_B3$period
+
+set.seed(1)
+train = sample(1:nrow(baseball_B3),40)
+test = (-train)
+ytest = y[test]
+
+
+set.seed(1)
+cv.lasso <- cv.glmnet(x[train,], y[train], alpha = 0.4)
+b = predict(cv.lasso, type = "coefficients", 
+                     s = cv.lasso$lambda.min)
+
+FAB2 <- function(FA) {
+  d <- with(FA, 
+            b[1]
+            + b[3] * WAR + b[4] * age + b[5] * Pscore
+            + b[7] * PA + b[12] * X3B
+            + b[17] * CS + b[18] * BB
+            + b[25] * AVG
+            )
+}
+```
+```{r}
+FABat2 <- FAB2(baseball_B1)
+FABat * round(FABat2)
+```
+
+
+## 5. Conclusion
+* 임창용, 장원준, 노경은, 윤성환, 장원삼
+```{r, echo = FALSE}
+library(glmnet)
+baseball_P3 <- read.csv("FA1218P3.csv", header = TRUE)
+x <- model.matrix(period ~., baseball_P3)[,-1]
+y <- baseball_P3$period
+
+set.seed(1)
+train = sample(1:nrow(baseball_P3),20)
+test = (-train)
+ytest = y[test]
+
+set.seed(1)
+cv.lasso <- cv.glmnet(x[train,], y[train], alpha = 0)
+b = predict(cv.lasso, type = "coefficients", 
+                     s = cv.lasso$lambda.min)
+
+FAP2 <- function(FA) {
+  d <- with(FA, b[1] + tWAR * b[2] + WAR * b[3] + age * b[4] + G * b[5] + CG * b[6] + SHO * b[7] + SP * b[8] + W * b[9] + L * b[10] + S * b[11] + H * b[12] + IP * b[13] + R * b[14] + ER * b[15] + PA * b[16] + X1B * b[17] + X2B * b[18] + X3B * b[19] + HR * b[20] + BB * b[21] + IBB * b[22] + HBP * b[23] + SO * b[24] + BK * b[25] + WP * b[26] + ERA * b[27] + FIP * b[28] + WHIP * b[29] + ERA. * b[30] + FIP. * b[31]
+  )
+}
+```
+```{r}
+FAPit2 <- FAP2(baseball_P1)
+FAPit * round(FAPit2)
+```
+
+# Thank you for watching
