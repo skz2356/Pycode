@@ -7,8 +7,6 @@
 
 - Basic
 
-- Doit_pandas
-
 - HandsOn_ML
 
 - Introduction_ML
