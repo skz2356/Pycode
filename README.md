@@ -15,13 +15,13 @@
 
 - Basic
 
-- HandsOn_ML
+- HandsOn_MachineLearning
 
-- Introduction_ML
+- Introduction_MachineLearning
 
 - Rcode
 
-- Scratch_DL
+- Scratch_DeepLearning
 
 ##
 
