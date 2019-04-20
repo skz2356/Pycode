@@ -1,4 +1,4 @@
-﻿# [Pycode: 파이썬 활용 정리]
+﻿# [Pycode: 파이썬 활용]
 
 
 ## Project
